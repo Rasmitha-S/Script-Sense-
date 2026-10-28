@@ -290,6 +290,21 @@ export const updateTranscriptApi = async (
   return response.data;
 };
 
+export const suggestCorrectionsApi = async (
+  sheetId: number,
+  token?: string | null
+): Promise<UploadResponse> => {
+  const response = await apiClient.post<UploadResponse>(
+    `/api/uploads/${sheetId}/suggest-corrections`,
+    {},
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+  return response.data;
+};
+
+
 // Students Management
 export const getStudentsApi = async (token?: string | null): Promise<Student[]> => {
   const response = await apiClient.get<Student[]>('/api/students', {
@@ -359,11 +374,11 @@ export const extractTextApi = async (
 ): Promise<ExtractTextResponse> => {
   const formData = new FormData();
   formData.append('file', file);
+  const authToken = token || localStorage.getItem('scriptsense_token');
   const response = await apiClient.post<ExtractTextResponse>('/api/extract-text', formData, {
     timeout: 60000,
     headers: {
-      'Content-Type': 'multipart/form-data',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     },
   });
   return response.data;

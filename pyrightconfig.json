@@ -1,0 +1,18 @@
+{
+  "venvPath": "backend",
+  "venv": "venv",
+  "extraPaths": [
+    "backend"
+  ],
+  "include": [
+    "backend"
+  ],
+  "exclude": [
+    "backend/venv",
+    "backend/.venv",
+    "**/node_modules",
+    "**/__pycache__"
+  ],
+  "reportPrivateImportUsage": "none",
+  "reportMissingImports": "warning"
+}

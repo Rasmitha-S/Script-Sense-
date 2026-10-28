@@ -1,142 +1,84 @@
 # ScriptSense 🎓📝
-**AI-Powered Handwritten Answer Sheet Evaluation System (Full-Stack TypeScript)**
+**AI-Powered Handwritten Answer Sheet Evaluation System**
 
-ScriptSense is a full-stack, enterprise-grade automated and teacher-in-the-loop examination grading platform. It digitizes handwritten examination scripts via multi-engine OCR (Gemini 1.5 Flash Vision + Tesseract.js fallback) and provides semantic AI evaluation, multi-question rubrics, teacher verification, student portal access, and interactive Gemini marks explanation.
-
----
-
-## ⚡ Tech Stack
-
-- **Frontend**: React 18, TypeScript, Vite, TailwindCSS / Vanilla CSS, Lucide Icons, Axios
-- **Backend**: Node.js (v20+ / v22+ / v24+), TypeScript, Express REST API, Native SQLite (`node:sqlite`)
-- **AI & OCR**: Google Gemini 1.5 Flash (Vision OCR + Chatbot Explainer), Tesseract.js (Offline Fallback), `pdf-parse`, `mammoth`
-- **Security & Auth**: JSON Web Tokens (`jsonwebtoken`), Bcrypt password hashing, Teacher-Student data isolation, Role-Based Access Control
-- **Deployment**: Single Vercel Project (SPA Frontend + Serverless API Functions)
+ScriptSense is an automated and teacher-in-the-loop grading platform that digitizes handwritten examination scripts via OCR and provides semantic AI evaluation using Sentence Transformers embeddings and step-wise rubrics.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start & Build
 
-### 1. Install Dependencies
-```bash
-npm run install:all
+### 1. One-Click Build & Verification
+To build the frontend bundle and verify all backend modules:
+```powershell
+.\build.bat
 ```
 
-### 2. Configure Environment Variables
-Copy and update `.env` files in both root/backend:
-```bash
-# In backend/.env or Vercel Environment Variables:
-PORT=8000
-JWT_SECRET=your_jwt_secret_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
-NODE_ENV=development
-```
-
-### 3. Launch Development Environment
-```bash
-npm run dev
-```
-or run the batch launcher on Windows:
+### 2. Launch Development Environment
+To run both the FastAPI Backend and Vite Frontend simultaneously:
 ```powershell
 .\start_dev.bat
 ```
 
 - **Frontend Application**: [http://localhost:5173](http://localhost:5173)
-- **Backend API**: [http://localhost:8000](http://localhost:8000)
-- **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+- **Backend API & Swagger Docs**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ---
 
-## 🧪 Build & Verification
-
-### Unified Build
-To compile the TypeScript backend and build the React production bundle:
-```bash
-npm run build
-```
-
-### Run Integration Test Suite
-To run the automated 18-step integration test suite covering auth, isolation, OCR, evaluation, teacher verification, CSV export, and student portal:
-```bash
-npm test
-```
-
----
-
-## ☁️ Vercel Deployment (One Project)
-
-ScriptSense is architected to deploy as **one unified Vercel project**:
-
-1. **Connect Repository**: Push to GitHub and link repository in Vercel Dashboard.
-2. **Framework Preset**: Select `Vite` (Root directory: `./`).
-3. **Build Command**: `npm run build`
-4. **Output Directory**: `frontend/dist`
-5. **Install Command**: `npm install`
-6. **Environment Variables**:
-   - `JWT_SECRET`: Random secure string (e.g. `scriptsense-super-secret-key-32chars`)
-   - `GEMINI_API_KEY`: Google Gemini API Key
-
-### Vercel Routing Structure (`vercel.json`):
-- `/api/(.*)` ➔ Handled by `api/index.ts` (Express serverless function)
-- `/uploads/(.*)` ➔ Handled by `api/index.ts` (Dynamic uploaded file server)
-- `/(.*)` ➔ Serves React SPA from `frontend/dist` with client-side routing
-
----
-
-## 🔑 Default Accounts
-
-| Role | Username | Email | Password | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **System Admin** | `admin` | `admin@scriptsense.com` | `admin123` | Platform oversight, teachers/students overview, global results |
-| **Teacher 1** | `teacher1` | `teacher1@scriptsense.com` | `secret123` | Dr. Sarah Smith (Evaluates exams, creates rubrics, verifies marks) |
-| **Teacher 2** | `teacher2` | `teacher2@scriptsense.com` | `secret123` | Prof. David Johnson (Isolated class roster & tests) |
-| **Student** | — | — | — | Access via assigned Roll Number (e.g. `CS-2024-001`) |
-
----
-
-## 📂 Project Architecture
+## 🛠 Project Structure
 
 ```
 ScriptSense/
-├── api/
-│   └── index.ts                 # Vercel Serverless Function entrypoint
-├── backend/
+├── backend/                  # FastAPI Application
+│   ├── database.py           # SQLite SQLAlchemy Engine & Session
+│   ├── models.py             # Relational Database Models
+│   ├── schemas.py            # Pydantic Schemas & Validations
+│   ├── main.py               # Application Entrypoint & Startup Seeds
+│   ├── routers/              # Modular API Endpoints
+│   │   ├── auth.py           # JWT Authentication & Teacher Accounts
+│   │   ├── students.py       # Student Profiles & Portal Access
+│   │   ├── uploads.py        # Answer Sheet Upload & OCR Processing
+│   │   ├── evaluation.py     # AI Semantic Scoring & Batch Processing
+│   │   ├── results.py        # Score Confirmation, Edits & CSV Export
+│   │   └── system.py         # System Storage Diagnostics
+│   ├── services/
+│   │   ├── evaluation_service.py # Sentence Transformers & Multi-Question Rubrics
+│   │   ├── ocr_service.py        # Tesseract & PDF2Image Pipeline
+│   │   └── file_service.py       # File Storage Management
+│   └── test_*.py             # Full Verification Test Suites
+│
+├── frontend/                 # React 18 + Vite + TailwindCSS
 │   ├── src/
-│   │   ├── app.ts               # Express Application configuration & middleware
-│   │   ├── server.ts            # Local development HTTP server
-│   │   ├── database/index.ts    # Native SQLite client & schema migrations
-│   │   ├── middleware/auth.ts   # JWT & role authorization
-│   │   ├── routes/              # Express REST API routes
-│   │   │   ├── authRoutes.ts    # Auth, reset password, student portal, explain marks
-│   │   │   ├── adminRoutes.ts   # System stats, teachers & students CRUD
-│   │   │   ├── testRoutes.ts    # Test creation, overview, students, batch eval
-│   │   │   ├── studentRoutes.ts # Teacher-isolated student management
-│   │   │   ├── uploadRoutes.ts  # Answer sheet upload & OCR
-│   │   │   ├── evalRoutes.ts    # Model answers & AI evaluation
-│   │   │   ├── resultRoutes.ts  # Teacher verification & CSV export
-│   │   │   └── systemRoutes.ts  # System health & storage metrics
-│   │   ├── services/
-│   │   │   ├── fileService.ts   # Multer file handler & storage
-│   │   │   ├── ocrService.ts    # Gemini Vision + Tesseract.js OCR pipeline
-│   │   │   ├── evaluationService.ts # Semantic scoring, keyword rubrics, multi-question
-│   │   │   └── geminiService.ts # Gemini 1.5 Flash marks chatbot explainer
-│   │   └── types/index.ts       # TypeScript Domain Models & Interfaces
-│   ├── test/
-│   │   └── run_tests.ts         # 18 End-to-end integration test suite
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/                    # React 18 + Vite + TypeScript Frontend
-│   ├── src/
-│   │   ├── pages/               # Dashboard, Upload, Evaluation, Results, Portal
-│   │   ├── components/          # Navigation, Header, Evaluation Cards
-│   │   ├── context/             # AuthContext state
-│   │   └── services/api.ts      # Axios API Client
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── tsconfig.json
-├── package.json                 # Unified workspace scripts & dependencies
-├── tsconfig.json                # Root TypeScript configuration
-├── vercel.json                  # Single project Vercel deployment configuration
-├── build.bat                    # Windows unified build script
-└── start_dev.bat                # Windows unified dev launcher
+│   │   ├── pages/            # Dashboard, Upload, Evaluation, Results, Student Portal
+│   │   ├── components/       # Reusable UI & Navigation Components
+│   │   ├── context/          # Auth Context & JWT Session State
+│   │   └── services/api.js   # Axios API Client
+│   └── package.json
+│
+├── build.bat                 # Unified Build & Test Script
+├── start_dev.bat             # Dual Server Startup Script
+└── README.md
+```
+
+---
+
+## 🔑 Default Credentials
+
+- **Admin**: `admin` / `admin@scriptsense.com` | Password: `admin123` (System Administrator - Global Control Hub)
+- **Teacher 1**: `teacher1` / `teacher1@scriptsense.com` | Password: `secret123` (Dr. Sarah Smith)
+- **Teacher 2**: `teacher2` / `teacher2@scriptsense.com` | Password: `secret123` (Prof. David Johnson)
+- **Student Portal**: Access using assigned Roll Number (e.g. from Students directory).
+
+---
+
+## 🧪 Running Test Suites
+
+Run individual automated test suites inside `backend/`:
+
+```powershell
+cd backend
+python test_complete_role_and_ownership.py
+python test_teacher_student_isolation.py
+python test_integration_inproc.py
+python test_multi_question_rubrics.py
+python test_batch_and_export.py
 ```

@@ -287,6 +287,10 @@ export interface ExtractTextResponse {
   extracted_text: string;
   file_type: string;
   status: string;
+  file_path?: string;
+  text?: string;
+  success?: boolean;
+  saved_filename?: string;
 }
 
 // --- Model Answer ---

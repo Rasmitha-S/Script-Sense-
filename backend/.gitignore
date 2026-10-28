@@ -1,7 +1,5 @@
 # Environment & Credentials
 .env
-.env.*
-!.env.example
 google-credentials.json
 
 # Python

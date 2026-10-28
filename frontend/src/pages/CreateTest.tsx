@@ -21,13 +21,15 @@ import {
   FileCheck,
   Loader2,
   Info,
-  X
+  X,
+  Eye
 } from 'lucide-react';
 
 interface AttachedFileInfo {
   name: string;
   size: string;
   type: string;
+  previewUrl?: string | null;
 }
 
 interface MultiQuestionState {
@@ -38,6 +40,8 @@ interface MultiQuestionState {
   rubric: RubricItem[];
   inputMethod: 'text' | 'upload';
   attachedFile: AttachedFileInfo | null;
+  previewUrl?: string | null;
+  filePath?: string | null;
   isExtracting: boolean;
   extractError: string;
   extractSuccess: boolean;
@@ -61,6 +65,8 @@ export const CreateTest: React.FC = () => {
   const [singleMaxMarks, setSingleMaxMarks] = useState<number | string>(10.0);
   const [singleInputMethod, setSingleInputMethod] = useState<'text' | 'upload'>('text');
   const [singleFile, setSingleFile] = useState<AttachedFileInfo | null>(null);
+  const [singleFilePreview, setSingleFilePreview] = useState<string | null>(null);
+  const [singleFilePath, setSingleFilePath] = useState<string | null>(null);
   const [singleExtracting, setSingleExtracting] = useState<boolean>(false);
   const [singleExtractError, setSingleExtractError] = useState<string>('');
   const [singleDragActive, setSingleDragActive] = useState<boolean>(false);
@@ -76,6 +82,8 @@ export const CreateTest: React.FC = () => {
       rubric: [],
       inputMethod: 'text',
       attachedFile: null,
+      previewUrl: null,
+      filePath: null,
       isExtracting: false,
       extractError: '',
       extractSuccess: false,
@@ -138,7 +146,7 @@ export const CreateTest: React.FC = () => {
     if (!file) return;
     const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowedExtensions.includes(fileExt) && !allowedFileTypes.includes(file.type)) {
-      setSingleExtractError('Unsupported file format. Please upload a PDF, DOCX, PNG, or JPG file.');
+      setSingleExtractError('Unsupported file format. Please upload a JPG, JPEG, PNG, or PDF file.');
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
@@ -149,9 +157,33 @@ export const CreateTest: React.FC = () => {
     setSingleExtractError('');
     setSingleExtracting(true);
 
+    // Generate immediate client-side preview for common image formats
+    const isImage = file.type.startsWith('image/') || ['.jpg', '.jpeg', '.png', '.webp'].includes(fileExt);
+    if (isImage) {
+      try {
+        setSingleFilePreview(URL.createObjectURL(file));
+      } catch {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setSingleFilePreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    } else {
+      setSingleFilePreview(null);
+    }
+
+    // Immediately register attached file for instant user feedback
+    setSingleFile({
+      name: file.name,
+      size: (file.size / 1024).toFixed(1) + ' KB',
+      type: fileExt.replace('.', '').toUpperCase() || 'IMAGE'
+    });
+
     try {
       const res = await extractTextApi(file, token || undefined);
-      setSingleAnswer(res.extracted_text || '');
+      setSingleAnswer(res.extracted_text || res.text || '');
+      setSingleFilePath(res.file_path || null);
       setSingleFile({
         name: file.name,
         size: (file.size / 1024).toFixed(1) + ' KB',
@@ -167,6 +199,8 @@ export const CreateTest: React.FC = () => {
 
   const handleSingleRemoveFile = () => {
     setSingleFile(null);
+    setSingleFilePreview(null);
+    setSingleFilePath(null);
     setSingleExtractError('');
     if (singleFileInputRef.current) singleFileInputRef.current.value = '';
   };
@@ -184,6 +218,8 @@ export const CreateTest: React.FC = () => {
         rubric: [],
         inputMethod: 'text',
         attachedFile: null,
+        previewUrl: null,
+        filePath: null,
         isExtracting: false,
         extractError: '',
         extractSuccess: false,
@@ -214,51 +250,119 @@ export const CreateTest: React.FC = () => {
     if (!file) return;
     const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowedExtensions.includes(fileExt) && !allowedFileTypes.includes(file.type)) {
-      const updated = [...questions];
-      updated[qIdx].extractError = 'Unsupported format. Please upload PDF, DOCX, PNG, or JPG.';
-      setQuestions(updated);
+      setQuestions((prev) => {
+        const next = [...prev];
+        if (next[qIdx]) next[qIdx] = { ...next[qIdx], extractError: 'Unsupported format. Please upload JPG, JPEG, PNG, or PDF.' };
+        return next;
+      });
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
-      const updated = [...questions];
-      updated[qIdx].extractError = 'File size exceeds 20MB limit.';
-      setQuestions(updated);
+      setQuestions((prev) => {
+        const next = [...prev];
+        if (next[qIdx]) next[qIdx] = { ...next[qIdx], extractError: 'File size exceeds 20MB limit.' };
+        return next;
+      });
       return;
     }
 
-    const updated = [...questions];
-    updated[qIdx].extractError = '';
-    updated[qIdx].isExtracting = true;
-    setQuestions([...updated]);
+    let immediatePreview: string | null = null;
+    const isImage = file.type.startsWith('image/') || ['.jpg', '.jpeg', '.png', '.webp'].includes(fileExt);
+    if (isImage) {
+      try {
+        immediatePreview = URL.createObjectURL(file);
+      } catch {
+        immediatePreview = null;
+      }
+    }
+
+    // Set attachedFile and previewUrl immediately for instantaneous user feedback
+    setQuestions((prev) => {
+      const next = [...prev];
+      if (next[qIdx]) {
+        next[qIdx] = {
+          ...next[qIdx],
+          extractError: '',
+          isExtracting: true,
+          previewUrl: immediatePreview || next[qIdx].previewUrl,
+          attachedFile: {
+            name: file.name,
+            size: (file.size / 1024).toFixed(1) + ' KB',
+            type: fileExt.replace('.', '').toUpperCase() || 'IMAGE'
+          }
+        };
+      }
+      return next;
+    });
+
+    if (isImage && !immediatePreview) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setQuestions((prev) => {
+          const next = [...prev];
+          if (next[qIdx]) {
+            next[qIdx] = { ...next[qIdx], previewUrl: e.target?.result as string };
+          }
+          return next;
+        });
+      };
+      reader.readAsDataURL(file);
+    }
 
     try {
       const res = await extractTextApi(file, token || undefined);
-      const postUpdated = [...questions];
-      postUpdated[qIdx].model_answer = res.extracted_text || '';
-      postUpdated[qIdx].attachedFile = {
-        name: file.name,
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        type: res.file_type || fileExt.replace('.', '').toUpperCase()
-      };
-      postUpdated[qIdx].isExtracting = false;
-      postUpdated[qIdx].extractSuccess = true;
-      postUpdated[qIdx].extractError = '';
-      setQuestions(postUpdated);
+      setQuestions((prev) => {
+        const next = [...prev];
+        if (next[qIdx]) {
+          next[qIdx] = {
+            ...next[qIdx],
+            model_answer: res.extracted_text || res.text || next[qIdx].model_answer,
+            filePath: res.file_path || null,
+            attachedFile: {
+              name: file.name,
+              size: (file.size / 1024).toFixed(1) + ' KB',
+              type: res.file_type || fileExt.replace('.', '').toUpperCase()
+            },
+            isExtracting: false,
+            extractSuccess: true,
+            extractError: ''
+          };
+        }
+        return next;
+      });
     } catch (err: any) {
       const detail = err.response?.data?.detail || err.message || 'Failed to extract text from file.';
-      const postUpdated = [...questions];
-      postUpdated[qIdx].isExtracting = false;
-      postUpdated[qIdx].extractError = detail;
-      setQuestions(postUpdated);
+      setQuestions((prev) => {
+        const next = [...prev];
+        if (next[qIdx]) {
+          next[qIdx] = {
+            ...next[qIdx],
+            isExtracting: false,
+            extractError: detail
+          };
+        }
+        return next;
+      });
     }
   };
 
   const handleQuestionRemoveFile = (qIdx: number) => {
-    const updated = [...questions];
-    updated[qIdx].attachedFile = null;
-    updated[qIdx].extractError = '';
-    updated[qIdx].extractSuccess = false;
-    setQuestions(updated);
+    setQuestions((prev) => {
+      const next = [...prev];
+      if (next[qIdx]) {
+        next[qIdx] = {
+          ...next[qIdx],
+          attachedFile: null,
+          previewUrl: null,
+          filePath: null,
+          extractError: '',
+          extractSuccess: false
+        };
+      }
+      return next;
+    });
+    const inputEl = document.getElementById(`file-input-q-${qIdx}`) as HTMLInputElement | null;
+    if (inputEl) inputEl.value = '';
   };
 
   const handleAddRubric = (qIdx: number) => {
@@ -373,12 +477,16 @@ export const CreateTest: React.FC = () => {
       if (mode === 'single') {
         payload.question = singleQuestion.trim();
         payload.answer_text = singleAnswer.trim();
+        if (singleFilePath) {
+          payload.file_path = singleFilePath;
+        }
       } else {
         payload.questions = questions.map((q, idx) => ({
           q_num: idx + 1,
           question: q.question.trim(),
           model_answer: q.model_answer.trim(),
           max_marks: parseFloat(String(q.max_marks)) || 5.0,
+          file_path: q.filePath || undefined,
           rubric: (q.rubric || []).map((r, rIdx) => ({
             id: r.id || `q${idx + 1}_r${rIdx + 1}`,
             criterion: r.criterion.trim(),
@@ -624,7 +732,8 @@ export const CreateTest: React.FC = () => {
                     <input
                       ref={singleFileInputRef}
                       type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,.docx,.doc,.webp"
+                      accept=".jpg,.jpeg,.png,.pdf,.docx,.doc,.webp,image/*"
+                      onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           handleSingleFileChange(e.target.files[0]);
@@ -661,7 +770,7 @@ export const CreateTest: React.FC = () => {
                               Click or Drag & Drop Model Answer (PDF, DOCX, Image)
                             </p>
                             <p className="text-[11px] text-slate-400 mt-0.5">
-                              DOCX text extracted instantly • Images & PDFs run through OCR pipeline
+                              JPG, JPEG, PNG, WEBP, PDF & DOCX • Images & PDFs run through OCR pipeline
                             </p>
                           </div>
                         </div>
@@ -698,6 +807,27 @@ export const CreateTest: React.FC = () => {
                           >
                             <X className="w-4 h-4" />
                           </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {singleFilePreview && (
+                      <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-xs text-slate-400">
+                          <span className="flex items-center space-x-1.5">
+                            <Eye className="w-3.5 h-3.5 text-brand-400" />
+                            <span className="font-medium text-slate-300">Model Answer Image Preview</span>
+                          </span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                            {singleFile?.type?.toUpperCase() || 'IMAGE'}
+                          </span>
+                        </div>
+                        <div className="relative rounded-lg overflow-hidden border border-slate-800 bg-slate-900/50 flex items-center justify-center p-2">
+                          <img
+                            src={singleFilePreview}
+                            alt="Model Answer Preview"
+                            className="max-h-60 rounded-md object-contain shadow-sm"
+                          />
                         </div>
                       </div>
                     )}
@@ -879,7 +1009,8 @@ export const CreateTest: React.FC = () => {
                         <input
                           id={`file-input-q-${qIdx}`}
                           type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.docx,.doc,.webp"
+                          accept=".jpg,.jpeg,.png,.pdf,.docx,.doc,.webp,image/*"
+                          onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
                           onChange={(e) => {
                             if (e.target.files && e.target.files[0]) {
                               handleQuestionFileUpload(qIdx, e.target.files[0]);
@@ -940,6 +1071,27 @@ export const CreateTest: React.FC = () => {
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {q.previewUrl && (
+                          <div className="p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2">
+                            <div className="flex items-center justify-between text-[11px] text-slate-400">
+                              <span className="flex items-center space-x-1.5">
+                                <Eye className="w-3 h-3 text-brand-400" />
+                                <span className="font-medium text-slate-300">Q{q.q_num} Image Preview</span>
+                              </span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                                {q.attachedFile?.type?.toUpperCase() || 'IMAGE'}
+                              </span>
+                            </div>
+                            <div className="relative rounded-lg overflow-hidden border border-slate-800 bg-slate-900/50 flex items-center justify-center p-2">
+                              <img
+                                src={q.previewUrl}
+                                alt={`Q${q.q_num} Preview`}
+                                className="max-h-48 rounded-md object-contain shadow-sm"
+                              />
                             </div>
                           </div>
                         )}

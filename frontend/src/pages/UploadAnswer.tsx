@@ -5,7 +5,8 @@ import {
   uploadAnswerSheetApi, 
   getStudentsApi, 
   getTestsApi,
-  updateTranscriptApi 
+  updateTranscriptApi,
+  suggestCorrectionsApi 
 } from '../services/api';
 import { 
   UploadCloud, 
@@ -25,8 +26,10 @@ import {
   Save, 
   Check, 
   Loader2, 
-  ShieldCheck 
+  ShieldCheck,
+  Wand2 
 } from 'lucide-react';
+
 import { Student, TestResponse } from '../types';
 
 export const UploadAnswer: React.FC = () => {
@@ -57,6 +60,7 @@ export const UploadAnswer: React.FC = () => {
   const [editableTranscript, setEditableTranscript] = useState<string>(workflowData.extractedText || '');
   const [savingTranscript, setSavingTranscript] = useState<boolean>(false);
   const [transcriptSaveSuccess, setTranscriptSaveSuccess] = useState<boolean>(false);
+  const [suggesting, setSuggesting] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -297,6 +301,22 @@ export const UploadAnswer: React.FC = () => {
       setError('Could not update OCR transcript.');
     } finally {
       setSavingTranscript(false);
+    }
+  };
+
+  const handleSuggestCorrections = async () => {
+    if (!workflowData.answerSheetId) return;
+    setSuggesting(true);
+    try {
+      const res = await suggestCorrectionsApi(workflowData.answerSheetId, token);
+      if (res && res.extracted_text) {
+        setEditableTranscript(res.extracted_text);
+        updateWorkflow({ extractedText: res.extracted_text });
+      }
+    } catch (err) {
+      console.warn('Could not suggest corrections:', err);
+    } finally {
+      setSuggesting(false);
     }
   };
 
@@ -688,15 +708,33 @@ export const UploadAnswer: React.FC = () => {
               />
 
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleSaveTranscript}
-                  disabled={savingTranscript}
-                  className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors disabled:opacity-50"
-                >
-                  <Save className="w-3.5 h-3.5 text-violet-400" />
-                  <span>{transcriptSaveSuccess ? 'Saved to Database!' : 'Save Edits in Place'}</span>
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleSaveTranscript}
+                    disabled={savingTranscript}
+                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5 text-violet-400" />
+                    <span>{transcriptSaveSuccess ? 'Saved to Database!' : 'Save Edits in Place'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSuggestCorrections}
+                    disabled={suggesting || savingTranscript}
+                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-brand-300 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 transition-colors disabled:opacity-50 shadow-sm"
+                    title="Suggest non-destructive handwriting OCR typo fixes"
+                  >
+                    {suggesting ? (
+                      <div className="w-3.5 h-3.5 border-2 border-brand-400/30 border-t-brand-400 rounded-full animate-spin"></div>
+                    ) : (
+                      <Wand2 className="w-3.5 h-3.5 text-brand-400" />
+                    )}
+                    <span>{suggesting ? 'Refining...' : 'Auto-Refine OCR Text'}</span>
+                  </button>
+                </div>
+
 
                 <div className="flex items-center space-x-2.5 w-full sm:w-auto justify-end">
                   <button
